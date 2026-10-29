@@ -446,7 +446,7 @@ Key concept:
 ````md magic-move {lines: true}
 ```ts
 export class ChatRoom extends DurableObject<Env> {
-  // 1. HTTP 101 upgrade handshake (runtime requires fetch() for WS upgrades)
+  // 1. Accept WebSocket & enable hibernation
   async fetch(request: Request): Promise<Response> {
     const [client, server] = Object.values(new WebSocketPair());
 
