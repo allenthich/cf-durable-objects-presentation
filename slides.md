@@ -41,8 +41,7 @@ colorSchema: auto
 
   <div class="flex items-center justify-between text-xs opacity-60 pt-4 border-t border-slate-500/20">
     <span>Reference: Cloudflare Developers — <em>Durable Objects Finally Make Sense</em></span>
-    <span class="font-mono">Press Space / → to navigate</span>
-  </div>
+    </div>
 </div>
 
 <!--
@@ -214,9 +213,15 @@ export class ChatRoom extends DurableObject<Env> {
 }
 ```
 
-<div class="cf-panel mt-3 flex items-center justify-between text-xs">
-  <span><strong>Limitation:</strong> Persistence works, but clients must <strong>poll or refresh</strong> for updates.</span>
-  <span class="cf-pill">Next: WebSockets</span>
+<div class="grid grid-cols-2 gap-3 mt-3 text-xs">
+  <div class="cf-panel">
+    <span class="font-semibold text-orange-600 dark:text-orange-400">Memory vs. Storage:</span>
+    <span class="opacity-80 ml-1">In-memory JS state has a 128 MB isolate heap ceiling. SQLite runs on the same thread with disk-backed durability.</span>
+  </div>
+  <div class="cf-panel flex items-center justify-between">
+    <span><strong>Limitation:</strong> Clients must poll for updates.</span>
+    <span class="cf-pill">Next: WebSockets</span>
+  </div>
 </div>
 
 <!--
@@ -373,7 +378,7 @@ Runtime behavior:
 ## Partitioning & Concurrency Model
 
 <p class="cf-subtitle">
-  Single-threaded execution guarantees consistency within a 128 MB memory ceiling. Scale horizontally across IDs.
+  Single-threaded execution guarantees consistency. Scale horizontally by partitioning state across IDs.
 </p>
 
 <div class="grid grid-cols-2 gap-5 mt-3">
@@ -564,10 +569,6 @@ Summary:
     </div>
   </div>
 
-  <div class="flex items-center justify-between text-xs opacity-60 pt-4 border-t border-slate-500/20">
-    <span>Durable Objects: Stateful coordination at the edge</span>
-    <span class="font-mono">Press Space / → to reveal common FAQs</span>
-  </div>
 </div>
 
 <!--

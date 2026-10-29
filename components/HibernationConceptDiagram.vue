@@ -83,18 +83,16 @@ const isSleeping = computed(() => current.value === 'hibernating')
             <span class="user-chip"><span class="live-dot" /> Alice</span>
             <span class="user-chip"><span class="live-dot" /> Bob</span>
           </div>
-          <div class="node-foot ok-text">Connected the whole time</div>
         </div>
 
-        <!-- Pipe 1: Users <-> Runtime Host (Always Open!) -->
+        <!-- Pipe 1: Users <-> Runtime Host -->
         <div class="pipe-col">
-          <div class="pipe-pill solid-pill">Always Open</div>
+          <div class="pipe-pill solid-pill">Client WebSockets</div>
           <svg viewBox="0 0 140 28" class="pipe-svg" aria-hidden="true">
             <line x1="6" y1="14" x2="134" y2="14" class="line-solid" />
             <polygon points="134,14 126,9 126,19" class="arrow-solid" />
             <polygon points="6,14 14,9 14,19" class="arrow-solid" />
           </svg>
-          <div class="pipe-sub">WebSocket stays alive</div>
         </div>
 
         <!-- Node 2: Runtime Host -->
@@ -104,7 +102,6 @@ const isSleeping = computed(() => current.value === 'hibernating')
           <p class="node-desc">
             Holds open WebSockets in lightweight native memory while instances sleep.
           </p>
-          <div class="node-foot">2 active sockets held</div>
         </div>
 
         <!-- Pipe 2: Runtime Host <-> Durable Object (Sleeps when idle!) -->
