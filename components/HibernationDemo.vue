@@ -8,7 +8,7 @@ interface ChatRow {
 }
 
 const isHibernating = ref(true)
-const lastEvent = ref('Idle — evicted from RAM while Cloudflare edge holds 2 open sockets')
+const lastEvent = ref('Idle — evicted from RAM while runtime host holds 2 open sockets')
 
 const rows = ref<ChatRow[]>([
   { id: 1, sender: 'Alice', content: 'Ship it today?' },
@@ -78,8 +78,8 @@ function hibernateNow() {
           </span>
           <button
             type="button"
-            class="action-btn"
             :disabled="isHibernating"
+            class="action-btn"
             @click="hibernateNow"
           >
             Simulate Idle

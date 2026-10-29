@@ -339,6 +339,25 @@ With Durable Objects, everyone in #general is ALREADY routed to the same instanc
 
 ---
 
+<div class="cf-eyebrow">03 · High-Level Concept</div>
+
+## How WebSocket Hibernation Works
+
+<p class="cf-subtitle">
+  The runtime host holds the open connections so your Durable Object can sleep for free whenever the room is quiet.
+</p>
+
+<HibernationConceptDiagram />
+
+<!--
+Here is the big idea in plain English—think of the runtime host like a receptionist holding the phone lines open:
+1. Active Conversation: Messages pass straight through the runtime host to the Durable Object.
+2. Room Goes Quiet: Instead of paying for an idle JavaScript instance to sit in memory holding open sockets, the Durable Object goes completely to sleep ($0 cost), while the runtime host keeps every user's WebSocket connected.
+3. Someone Sends a Message: The moment anyone speaks, the runtime host wakes the Durable Object back up in milliseconds to save and broadcast—users never notice or reconnect.
+-->
+
+---
+
 <div class="cf-eyebrow">03 · Hibernatable WebSocket API</div>
 
 ## Step 4: Accept, Hibernate, Wake & Broadcast
@@ -354,7 +373,7 @@ export class ChatRoom extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const [client, server] = Object.values(new WebSocketPair());
 
-    // Cloudflare keeps the client socket open even if this DO hibernates!
+    // Runtime host keeps the client socket open even if this DO hibernates!
     this.ctx.acceptWebSocket(server);
 
     return new Response(null, { status: 101, webSocket: client });
@@ -385,8 +404,8 @@ export class ChatRoom extends DurableObject<Env> {
 ````
 
 <!--
-First click: Instead of standard ws.accept(), we call this.ctx.acceptWebSocket(server). That opts into WebSocket Hibernation—when nobody is typing, Cloudflare evicts the Durable Object from memory so you stop paying for idle duration, while Cloudflare's edge keeps every client's WebSocket connection alive.
-Second click: The moment anyone sends a frame, Cloudflare wakes the object, invokes webSocketMessage(), saves to SQLite, and broadcasts to this.ctx.getWebSockets().
+First click: Instead of standard ws.accept(), we call this.ctx.acceptWebSocket(server). That opts into WebSocket Hibernation—when nobody is typing, the runtime evicts the Durable Object from memory so you stop paying for idle duration, while the runtime host keeps every client's WebSocket connection alive.
+Second click: The moment anyone sends a frame, the runtime host wakes the object, invokes webSocketMessage(), saves to SQLite, and broadcasts to this.ctx.getWebSockets().
 -->
 
 ---
@@ -403,7 +422,7 @@ Second click: The moment anyone sends a frame, Cloudflare wakes the object, invo
 
 <!--
 Here's what happens at runtime:
-- Even when ChatRoom("general") is hibernating at 0 MB RAM, Alice and Bob's browser WebSockets remain OPEN at Cloudflare's edge.
+- Even when ChatRoom("general") is hibernating at 0 MB RAM, Alice and Bob's browser WebSockets remain OPEN on the runtime host.
 - Click "Send as Alice": the Durable Object wakes in milliseconds, inserts the row into SQLite, and broadcasts to both clients.
 - On the frontend, we replace HTTP polling with a standard WebSocket addEventListener("message") listener.
 -->
@@ -532,7 +551,7 @@ You can keep your existing backend and database untouched, and introduce a small
     <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · REAL-TIME</div>
     <div class="font-semibold text-sm mt-1">Hibernatable WebSockets</div>
     <p class="text-xs opacity-80 mt-1">
-      <code>ctx.acceptWebSocket()</code> keeps client sockets open at the edge while idle instances sleep for free.
+      <code>ctx.acceptWebSocket()</code> keeps client sockets open in the runtime host while idle instances sleep for free.
     </p>
   </div>
 

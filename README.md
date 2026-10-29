@@ -31,7 +31,8 @@ pnpm export
 
 ## Project structure
 
-- `slides.md` — 12-slide presentation covering the mental model, HTTP + SQLite implementation, Hibernatable WebSockets, and partitioning patterns.
+- `slides.md` — 13-slide presentation covering the mental model, HTTP + SQLite implementation, WebSocket hibernation concept and API, and partitioning patterns.
 - `components/RoomRoutingDemo.vue` — Interactive simulator demonstrating deterministic `idFromName(roomId)` routing across edge locations.
+- `components/HibernationConceptDiagram.vue` — High-level visual diagram showing how the runtime host (`Connection Manager`) keeps WebSockets open while an idle Durable Object sleeps at `$0` cost.
 - `components/HibernationDemo.vue` — Interactive simulator showing WebSocket hibernation (`0 MB` idle memory) and automatic wake-and-broadcast with embedded SQLite.
 - `style.css` — Light and dark theme variables and typography rules.
