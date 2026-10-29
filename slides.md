@@ -206,520 +206,493 @@ A Durable Object fills this gap: one instance per entity with private storage an
 ## Anatomy of a Durable Object
 
 <p class="cf-subtitle">
-  Three core guarantees that make stateful coordination simple and safe.
+  A stateful serverless function combining deterministic routing, single-threaded execution, and private storage.
 </p>
 
-<div class="grid grid-cols-3 gap-4 mt-6">
+<div class="grid grid-cols-3 gap-4 mt-5">
   <div class="cf-panel flex flex-col justify-between">
     <div>
-      <div class="flex items-center gap-2 font-semibold text-base">
-        <div class="i-lucide-map-pin text-orange-500" />
-        <span>Deterministic Addressing</span>
-      </div>
-      <p class="text-sm opacity-80 mt-2">
-        Routed by unique ID or name (<code>idFromName("room-123")</code>). Every request worldwide for that ID routes to the <strong>exact same instance</strong>.
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">01 · ADDRESSING</div>
+      <div class="font-semibold text-base mt-1">Deterministic ID Routing</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Resolved globally by string name or unique ID (<code>idFromName("room_general")</code>). Every caller globally reaches the exact same coordinator.
       </p>
     </div>
-    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono text-orange-600 dark:text-orange-400">
-      Single point of coordination
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-75">
+      One ID = One Global Instance
     </div>
   </div>
 
   <div class="cf-panel flex flex-col justify-between">
     <div>
-      <div class="flex items-center gap-2 font-semibold text-base">
-        <div class="i-lucide-cpu text-blue-500" />
-        <span>Single-Threaded Execution</span>
-      </div>
-      <p class="text-sm opacity-80 mt-2">
-        Processes events <strong>one at a time</strong>. No race conditions, no distributed locks, no mutexes required across concurrent clients.
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">02 · EXECUTION</div>
+      <div class="font-semibold text-base mt-1">Single-Threaded Execution</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Executes synchronously on one thread. Eliminates concurrency race conditions by design without locks (throughput constraint: ~1,000 req/s per entity).
       </p>
     </div>
-    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono text-blue-600 dark:text-blue-400">
-      Zero concurrency races
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-75">
+      Lock-Free Strong Consistency
     </div>
   </div>
 
-  <div class="cf-panel flex flex-col justify-between">
+  <div class="cf-panel-accent flex flex-col justify-between">
     <div>
-      <div class="flex items-center gap-2 font-semibold text-base">
-        <div class="i-lucide-database text-emerald-500" />
-        <span>128 MB RAM + Private SQLite</span>
-      </div>
-      <p class="text-sm opacity-80 mt-2">
-        Fast in-memory JS state (up to 128 MB heap ceiling) with disk-backed, zero-latency SQLite embedded right on the same thread.
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · STORAGE &amp; RAM</div>
+      <div class="font-semibold text-base mt-1">128 MB RAM + Private SQLite</div>
+      <p class="text-xs opacity-90 mt-2 leading-relaxed">
+        Subject to a 128 MB V8 isolate heap ceiling. Use RAM as a lean cache, stream large payloads, and persist state to zero-latency, disk-backed SQLite.
       </p>
     </div>
-    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono text-emerald-600 dark:text-emerald-400">
-      In-memory speed + ACID durability
+    <div class="mt-4 pt-3 border-t border-orange-500/30 text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">
+      Zero-Hop Disk Persistence
     </div>
   </div>
 </div>
 
 <!--
-Three architectural pillars:
-1. Deterministic Addressing: One ID = One instance worldwide. No routing ambiguity.
-2. Single-Threaded: Strictly serial execution prevents race conditions.
-3. 128 MB RAM + SQLite: Hot data lives in isolate memory, cold/durable data lives in embedded SQLite with zero network hops.
+The three core pillars of a Durable Object:
+1. Deterministic Addressing: One ID = One global instance.
+2. Single-Threaded Execution: Sequential execution guarantees strong consistency without distributed locks. (Constraint: ~1k req/s).
+3. Memory & Storage: 128 MB heap ceiling is respected by treating RAM as an ephemeral cache and storing durable state in co-located SQLite.
 -->
 
 ---
 
-<div class="cf-eyebrow">02 · Architecture</div>
+<div class="cf-eyebrow">01 · Mental Model</div>
 
-## The Golden Rule: One ID = One Durable Object
+## The Golden Rule: `One ID = One Durable Object`
 
 <p class="cf-subtitle">
-  Partition by domain entity, not by user. Each chat room, document, or game session gets its own isolated object.
+  Deterministic global routing: callers using the same ID reach the exact same coordinator.
 </p>
 
-<div class="mt-4">
-  <RoomRoutingDemo />
-</div>
+<RoomRoutingDemo />
 
 <!--
-The fundamental architectural decision:
-- Durable Objects scale horizontally by having thousands or millions of small objects.
-- Each object handles a single entity (e.g., room-alpha, room-beta).
-- Requests for room-alpha always land on the room-alpha instance, wherever it lives globally.
+The fundamental mental model: One ID = One global instance.
+Clicking the room buttons shows how Alice (Tokyo) and Bob (London) route to the exact same ChatRoom("general") instance, while #incidents runs in an independent instance with its own SQLite database.
 -->
 
 ---
 
-<div class="cf-eyebrow">02 · Implementation</div>
+<div class="cf-eyebrow">02 · Base Implementation (HTTP + SQLite)</div>
 
 ## Step 1: Route by Room ID & Call RPC Methods
 
 <p class="cf-subtitle">
-  Use <code>env.CHAT_ROOM.idFromName()</code> to locate the object, then call TypeScript RPC methods directly.
+  Extract the room name, resolve the deterministic stub, and call typed RPC methods.
 </p>
 
-<div class="grid grid-cols-2 gap-4 mt-4">
-  <div class="cf-panel">
-    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold mb-2">WORKER · ROUTING</div>
-    <p class="text-sm opacity-80 mb-3">The Worker routes incoming HTTP requests to the target room's DO stub.</p>
-    <div class="text-xs opacity-70">
-      <strong>Key pattern:</strong> <code>idFromName(roomId)</code> produces a deterministic 64-character hex ID. The Worker never manages instance lifecycle.
-    </div>
-  </div>
+```ts {1-6|8-10|12-20|all}
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const match = url.pathname.match(/^\/rooms\/([^/]+)\/messages$/);
+    if (!match) return new Response("Not found", { status: 404 });
+    const roomId = match[1];
 
-  <div class="cf-panel">
-    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold mb-2">DURABLE OBJECT · EXPORT</div>
-    <p class="text-sm opacity-80 mb-3">The class extends <code>DurableObject</code> and exposes standard async methods.</p>
-    <div class="text-xs opacity-70">
-      <strong>RPC calls:</strong> Methods like <code>getHistory()</code> are called directly over RPC with full type safety—no manual JSON fetch boilerplate.
-    </div>
-  </div>
-</div>
+    // Deterministic lookup: same roomId -> same instance
+    const id = env.CHAT_ROOM.idFromName(roomId);
+    const stub = env.CHAT_ROOM.get(id);
 
-```ts
-// Worker entrypoint: route request to the target room
-const id = env.CHAT_ROOM.idFromName(roomId)
-const stub = env.CHAT_ROOM.get(id)
-
-// Direct RPC call — type-safe, no manual fetch() serialization
-const history = await stub.getHistory()
-return Response.json(history)
+    // Call methods directly via Workers RPC
+    if (request.method === "GET") {
+      return Response.json(await stub.getMessages());
+    }
+    if (request.method === "POST") {
+      const { sender, text } = await request.json<{ sender: string; text: string }>();
+      return Response.json(await stub.sendMessage(sender, text));
+    }
+    return new Response("Method not allowed", { status: 405 });
+  },
+};
 ```
 
 <!--
-Step 1: Routing & RPC.
-Workers don't instantiate objects manually; they derive an ID from a name and obtain a stub.
-Calls on the stub invoke methods on the remote Durable Object seamlessly via Cloudflare's Cap'n Proto RPC.
+Workers RPC eliminates internal HTTP serialization boilerplate.
+The Worker resolves the room ID, gets the stub, and calls stub.getMessages() or stub.sendMessage() as standard async TypeScript methods.
 -->
 
 ---
 
-<div class="cf-eyebrow">02 · Implementation</div>
+<div class="cf-eyebrow">02 · Base Implementation (HTTP + SQLite)</div>
 
-## Step 2: Persist State Inside the ChatRoom Class
+## Step 2: Persist State Inside the `ChatRoom` Class
 
 <p class="cf-subtitle">
-  Every Durable Object has its own zero-latency, private SQLite database via <code>this.ctx.storage.sql</code>.
+  Initialize schema on startup, then query SQLite synchronously inside RPC methods.
 </p>
 
-```ts
-import { DurableObject } from 'cloudflare:workers'
+```ts {1-11|13-15|17-20|all}
+import { DurableObject } from "cloudflare:workers";
 
-export class ChatRoom extends DurableObject {
+export class ChatRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env)
-    // Run migrations on first startup — private SQLite database per room
-    this.ctx.storage.sql.exec(`
+    super(ctx, env);
+    ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT NOT NULL,
-        text TEXT NOT NULL,
-        timestamp INTEGER NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, text TEXT
       )
-    `)
+    `);
   }
 
-  async getHistory() {
-    return this.ctx.storage.sql.exec('SELECT * FROM messages ORDER BY timestamp DESC LIMIT 50').toArray()
+  async getMessages() {
+    return this.ctx.storage.sql.exec("SELECT * FROM messages ORDER BY id ASC").toArray();
+  }
+
+  async sendMessage(sender: string, text: string) {
+    this.ctx.storage.sql.exec("INSERT INTO messages (sender, text) VALUES (?, ?)", sender, text);
+    return { ok: true };
   }
 }
 ```
 
-<div class="grid grid-cols-2 gap-3 mt-2 text-xs">
-  <div class="cf-panel">
-    <strong>Synchronous SQLite:</strong> <code>sql.exec()</code> executes in-process on the same thread without network latency.
-  </div>
-  <div class="cf-panel">
-    <strong>128 MB Heap Ceiling:</strong> In-memory JS variables have a 128 MB limit; large or durable histories live safely in SQLite.
-  </div>
+<div class="cf-panel mt-3 flex items-center justify-between text-xs">
+  <span><strong>Limitation:</strong> Persistence works, but clients must <strong>poll or refresh</strong> for updates.</span>
+  <span class="cf-pill">Next: WebSockets</span>
 </div>
 
 <!--
-Step 2: Embedded SQLite persistence.
-Unlike external SQL databases, this SQLite instance is private to this exact room.
-It runs synchronously in the same thread with zero network latency.
+Inside ChatRoom:
+- blockConcurrencyWhile ensures schema creation finishes before any method handles traffic.
+- ctx.storage.sql.exec runs synchronously on the same thread without network hops.
+- Next step: add WebSockets to push updates without polling.
 -->
 
 ---
 
-<div class="cf-eyebrow">02 · Architecture</div>
+<div class="cf-eyebrow">03 · Real-Time Coordination</div>
 
 ## Real-Time Architecture
 
 <p class="cf-subtitle">
-  Why Durable Objects collapse a 4-tier real-time stack into a single coordinated primitive.
+  Eliminate the dedicated WebSocket fleet and Redis pub/sub backplane with a single coordination primitive.
 </p>
 
-<div class="grid grid-cols-2 gap-4 mt-3">
+<div class="grid grid-cols-2 gap-4 mt-2">
   <div class="cf-panel flex flex-col justify-between">
     <div>
-      <div class="font-mono text-xs text-slate-500 font-bold mb-2">TYPICAL ARCHITECTURE</div>
-      <div class="space-y-1.5 text-xs opacity-80">
-        <div class="p-2 rounded bg-slate-500/10 font-mono">1. Clients connect via WebSocket Gateway</div>
-        <div class="p-2 rounded bg-slate-500/10 font-mono">2. Redis Pub/Sub brokers messages between nodes</div>
-        <div class="p-2 rounded bg-slate-500/10 font-mono">3. Stateless Node.js / Go workers execute logic</div>
-        <div class="p-2 rounded bg-slate-500/10 font-mono">4. External DB (PostgreSQL) stores durable data</div>
-      </div>
-      <div class="text-xs opacity-70 mt-3">
-        <strong>Best for:</strong> Massive global broadcasts (100k+ viewers on 1 channel) and query-heavy analytics.
-      </div>
+      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Typical Architecture</div>
+      <div class="font-semibold text-sm mt-1">4 Components to Synchronize</div>
+      <ul class="text-xs space-y-1.5 mt-2 opacity-85">
+        <li>Stateless API servers + load balancer</li>
+        <li>Dedicated stateful WebSocket gateways</li>
+        <li>Redis Pub/Sub backplane for event fanout</li>
+        <li>External database with connection pooling</li>
+      </ul>
     </div>
-    <div class="mt-3 pt-2 border-t border-slate-500/20 text-xs font-mono opacity-70">
-      ✗ 4 systems to monitor, scale, and pay for 24/7
+    <div class="mt-3 pt-2.5 border-t border-slate-500/20 text-xs opacity-75">
+      <strong>Best for:</strong> Global broadcast (10k+ viewers), massive 1-to-many fanout, cross-table SQL joins.
     </div>
   </div>
 
   <div class="cf-panel-accent flex flex-col justify-between">
     <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold mb-2">DURABLE OBJECT ARCHITECTURE</div>
-      <div class="space-y-1.5 text-xs">
-        <div class="p-2 rounded bg-orange-500/10 font-mono">1. Clients connect directly to room DO via WebSocket</div>
-        <div class="p-2 rounded bg-orange-500/10 font-mono">2. Single-threaded &amp; synchronous: zero race conditions</div>
-        <div class="p-2 rounded bg-orange-500/10 font-mono">3. Co-located in-memory state &amp; private SQLite</div>
-        <div class="p-2 rounded bg-orange-500/10 font-mono">4. Hibernation: $0 compute cost when idle</div>
-      </div>
-      <div class="text-xs opacity-75 mt-3">
-        <strong>Best for:</strong> Partitionable entities (chat rooms, documents, games, IoT devices, carts).
-      </div>
+      <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400">Durable Object Architecture</div>
+      <div class="font-semibold text-sm mt-1">1 Self-Contained Instance per Room</div>
+      <ul class="text-xs space-y-1.5 mt-2">
+        <li><strong>Colocated coordination:</strong> Same instance holds active room WebSockets</li>
+        <li><strong>Lock-free consistency:</strong> Single-threaded execution eliminates race conditions</li>
+        <li><strong>Private SQLite:</strong> Zero-latency SQL persistence on the exact same thread</li>
+        <li><strong>Hibernation:</strong> Sockets stay open while idle instances sleep at $0</li>
+        <li><strong>Zero Redis:</strong> No pub/sub fleet needed for in-room fanout</li>
+      </ul>
     </div>
-    <div class="mt-3 pt-2 border-t border-orange-500/30 text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">
-      ✓ One primitive replaces Gateway, Pub/Sub &amp; DB hops
+    <div class="mt-3 pt-2.5 border-t border-orange-500/30 text-xs text-orange-600 dark:text-orange-400 font-medium">
+      <strong>Best for:</strong> Scoped collaboration (2–500 users), lock-free single-writer state, sparse idle sockets.
     </div>
   </div>
 </div>
 
+
+
 <!--
-Architecture comparison:
-- Typical: Multi-tier sprawl (Gateways + Redis + Worker Fleets + DB). Great for 100k broadcast streams, but heavy for room-based apps.
-- DO Architecture: Single-threaded and synchronous coordination right where connections live.
+Architectural comparison:
+- When to use Typical Architecture: Massive one-to-many fanout (10k+ listeners on one channel like a sports ticker) or complex cross-table SQL reporting.
+- When to use Durable Objects: Scoped collaborative groups (chat channels, collaborative docs, game lobbies), single-writer state machines (auctions, seat reservations), and sparse connections where hibernation eliminates idle gateway costs.
+- The 128 MB isolate limit is managed by persisting state directly to embedded SQLite rather than accumulating in-memory buffers.
 -->
 
 ---
 
-<div class="cf-eyebrow">03 · Real-Time WebSockets</div>
+<div class="cf-eyebrow">03 · High-Level Concept</div>
 
 ## How WebSocket Hibernation Works
 
 <p class="cf-subtitle">
-  Keep thousands of connections open while paying only for active CPU execution time.
+  The runtime host keeps client sockets open while idle Durable Objects sleep at $0 cost.
 </p>
 
-<div class="mt-2">
-  <HibernationConceptDiagram />
-</div>
+<HibernationConceptDiagram />
 
 <!--
-WebSocket Hibernation solves the idle connection cost problem:
-- Traditional servers charge for RAM and CPU as long as a socket stays open.
-- Cloudflare offloads the TCP connection to the edge network infrastructure.
-- The isolate shuts down and only wakes up when a frame arrives or an alarm fires.
+Key concept:
+1. Active Conversation: Messages flow directly through the host to the Durable Object.
+2. Room Goes Quiet: Sockets remain open in lightweight native memory; the JS isolate is evicted ($0 compute cost).
+3. Message Arrives: The host wakes the instance in milliseconds to persist and broadcast.
 -->
 
 ---
 
-<div class="cf-eyebrow">03 · Real-Time WebSockets</div>
+<div class="cf-eyebrow">03 · Hibernatable WebSocket API</div>
 
 ## Step 3: Accept, Hibernate, Wake & Broadcast
 
 <p class="cf-subtitle">
-  Use <code>ctx.acceptWebSocket()</code> to delegate socket management to the Cloudflare network.
+  Use <code>acceptWebSocket</code> to delegate sockets and <code>webSocketMessage</code> to handle incoming frames.
 </p>
 
+````md magic-move {lines: true}
 ```ts
-export class ChatRoom extends DurableObject {
-  async fetch(request: Request) {
-    const pair = new WebSocketPair()
-    // Accept socket into the DO hibernation system
-    this.ctx.acceptWebSocket(pair[1])
-    return new Response(null, { status: 101, webSocket: pair[0] })
-  }
+export class ChatRoom extends DurableObject<Env> {
+  // 1. Accept WebSocket & enable hibernation
+  async fetch(request: Request): Promise<Response> {
+    const [client, server] = Object.values(new WebSocketPair());
 
-  async webSocketMessage(ws: WebSocket, message: string) {
-    // DO automatically wakes from hibernation when a message arrives
-    const data = JSON.parse(message)
-    this.ctx.storage.sql.exec('INSERT INTO messages (user, text) VALUES (?, ?)', data.user, data.text)
+    // Host holds the connection open even if this instance hibernates
+    this.ctx.acceptWebSocket(server);
 
-    // Broadcast to all connected sockets in this room
-    for (const client of this.ctx.getWebSockets()) {
-      client.send(JSON.stringify(data))
-    }
+    return new Response(null, { status: 101, webSocket: client });
   }
 }
 ```
 
+```ts
+export class ChatRoom extends DurableObject<Env> {
+  async fetch(request: Request): Promise<Response> {
+    const [client, server] = Object.values(new WebSocketPair());
+    this.ctx.acceptWebSocket(server);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  // 2. Wakes on incoming frame -> persists -> broadcasts
+  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+    const { sender, text } = JSON.parse(String(raw));
+    this.ctx.storage.sql.exec("INSERT INTO messages (sender, text) VALUES (?, ?)", sender, text);
+
+    const payload = JSON.stringify({ sender, text });
+    for (const peer of this.ctx.getWebSockets()) {
+      peer.send(payload);
+    }
+  }
+}
+```
+````
+
 <!--
-Step 3: Hibernatable WebSockets in action.
-- acceptWebSocket() registers the socket with the runtime.
-- webSocketMessage() automatically wakes the DO only when an event occurs.
-- getWebSockets() returns all active connections in this room.
+First step: ctx.acceptWebSocket(server) registers the socket with the host runtime. When traffic stops, the object unloads from RAM without dropping clients.
+Second step: When a message arrives, the object wakes, invokes webSocketMessage(), writes to SQLite, and broadcasts across this.ctx.getWebSockets().
 -->
 
 ---
 
-<div class="cf-eyebrow">03 · Real-Time WebSockets</div>
+<div class="cf-eyebrow">03 · Interactive Lifecycle</div>
 
 ## Live Walkthrough: Hibernation + Instant Broadcast
 
 <p class="cf-subtitle">
-  Simulate real-time messaging, isolate hibernation sleep, and instant zero-cost wake.
+  Send messages while asleep to verify instant wake-up, or click <strong>Simulate Idle</strong> to hibernate.
 </p>
 
-<div class="mt-4">
-  <HibernationDemo />
-</div>
+<HibernationDemo />
 
 <!--
-Interactive demo showing the lifecycle:
-- Active: Processing messages, writing to SQLite.
-- Idle: Sleeping, memory reclaimed, $0 compute charges.
-- Wake: Sub-millisecond reactivation when a new message arrives.
+Runtime behavior:
+- During hibernation, sockets remain connected on the host at 0 MB RAM billed.
+- Sending a message wakes the instance instantly, runs SQLite INSERT, and broadcasts.
+- Clients experience seamless real-time chat with no reconnections.
 -->
 
 ---
 
-<div class="cf-eyebrow">04 · Scaling & Best Practices</div>
+<div class="cf-eyebrow">04 · Architectural Best Practices</div>
 
 ## Partitioning & Concurrency Model
 
 <p class="cf-subtitle">
-  Scale horizontally by partitioning across many objects. Avoid creating a single global bottleneck.
+  Single-threaded execution guarantees consistency. Scale horizontally by partitioning state across IDs.
 </p>
 
-<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="grid grid-cols-2 gap-5 mt-3">
   <div class="cf-panel-accent">
-    <div class="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold mb-2">DO THIS · GRANULAR PARTITIONING</div>
-    <div class="text-sm font-semibold mb-1">One Object per Natural Domain Entity</div>
-    <p class="text-xs opacity-80 leading-relaxed mb-3">
-      Partition by chat room, document ID, shopping cart, or workspace. Each object handles its own traffic independently.
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-base text-orange-600 dark:text-orange-400">✓ DO: Granular Partitioning</span>
+      <span class="cf-pill">Unbounded Scale</span>
+    </div>
+    <p class="text-xs opacity-85 mt-2">
+      Scope instances to the smallest unit needing coordinated state:
     </p>
-    <div class="p-2 rounded bg-emerald-500/10 font-mono text-xs text-emerald-700 dark:text-emerald-300">
-      env.CHAT_ROOM.idFromName(`room:${orgId}:${channelId}`)
-    </div>
-    <div class="mt-3 text-xs opacity-70">
-      Scales horizontally to millions of concurrent rooms.
-    </div>
+    <ul class="text-xs space-y-1.5 mt-3">
+      <li><code>ChatRoom("room_general")</code> — one per channel</li>
+      <li><code>Document("doc_89a1")</code> — one per document</li>
+      <li><code>GameMatch("match_402")</code> — one per match lobby</li>
+      <li><code>AgentSession("agent_run_4")</code> — one per workflow</li>
+    </ul>
   </div>
 
-  <div class="cf-panel">
-    <div class="font-mono text-xs text-red-500 font-bold mb-2">AVOID THIS · GLOBAL SINGLETON</div>
-    <div class="text-sm font-semibold mb-1">One Giant Object for Everything</div>
-    <p class="text-xs opacity-80 leading-relaxed mb-3">
-      Funneling all app traffic through a single Durable Object creates a single-threaded CPU bottleneck and hits the 128 MB memory limit.
+  <div class="cf-panel" style="border-color: rgba(239, 68, 68, 0.35);">
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-base text-red-600 dark:text-red-400">✗ DON'T: Global Singleton</span>
+      <span class="cf-pill">Bottleneck</span>
+    </div>
+    <p class="text-xs opacity-85 mt-2">
+      Never funnel global application traffic through a single ID:
     </p>
-    <div class="p-2 rounded bg-red-500/10 font-mono text-xs text-red-700 dark:text-red-300">
-      env.CHAT_ROOM.idFromName("global-chat-master") // ✗ Anti-pattern
-    </div>
-    <div class="mt-3 text-xs opacity-70">
-      Limits throughput to ~1,000 req/sec total.
-    </div>
+    <ul class="text-xs space-y-1.5 mt-3 opacity-85">
+      <li><code>AppDatabase("GLOBAL")</code> — serializes all users in one queue</li>
+      <li><code>RateLimiter("ALL_TRAFFIC")</code> — bottlenecks edge requests</li>
+      <li>Cross-room queries — aggregate via D1 or Analytics Engine instead</li>
+    </ul>
   </div>
 </div>
 
 <!--
-Best practices for partitioning:
-- The secret to DO scale is horizontal division of state.
-- 10,000 rooms with 10 users each = 10,000 separate DOs running in parallel.
-- Never use a DO as a global database replacement for your entire application.
+Single-threaded execution guarantees lock-free consistency within an instance, eliminating concurrency races.
+Each instance has a 128 MB memory limit: keep RAM lean, offload state to SQLite, and stream large payloads rather than buffering.
+To scale, partition by entity: 10,000 active rooms run across 10,000 parallel Durable Objects.
 -->
 
 ---
 
-<div class="cf-eyebrow">04 · Scaling & Best Practices</div>
+<div class="cf-eyebrow">04 · Practical Adoption</div>
 
-## Integration Strategy: Durable Objects Sidecar
+## Integration Strategy
 
 <p class="cf-subtitle">
-  You don't need to rewrite your entire backend. Keep your existing API and add DOs where coordination is needed.
+  Run Durable Objects as a specialized coordination tier alongside your existing database and APIs.
 </p>
 
-<div class="grid grid-cols-3 gap-3.5 mt-6">
-  <div class="cf-panel flex flex-col justify-between">
+<div class="grid grid-cols-12 gap-4 mt-3 items-stretch">
+  <div class="col-span-6 cf-panel flex flex-col justify-between">
     <div>
-      <div class="font-mono text-xs text-slate-500 font-bold mb-2">EXISTING BACKEND</div>
-      <div class="font-semibold text-sm mb-1">Auth &amp; Core Business Logic</div>
-      <p class="text-xs opacity-80 leading-relaxed">
-        Next.js, Rails, Django, Go API handling users, payments, and CRUD against PostgreSQL.
+      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Keep Core Stack</div>
+      <div class="font-semibold text-base mt-1">Existing App & Primary DB</div>
+      <p class="text-xs opacity-80 mt-2">
+        Keep auth, billing, CRUD APIs, and reporting in your current stack (Postgres, Next.js, Rails, Go).
       </p>
     </div>
-    <div class="mt-3 text-xs font-mono opacity-60">
-      No migration needed
+    <div class="pt-3 mt-4 border-t border-slate-500/20 text-xs font-mono opacity-75">
+      Best for: Relational queries, billing, CRUD
     </div>
   </div>
 
-  <div class="cf-panel-accent flex flex-col justify-between">
+  <div class="col-span-6 cf-panel-accent flex flex-col justify-between">
     <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold mb-2">DO COORDINATOR</div>
-      <div class="font-semibold text-sm mb-1">Real-Time Sidecar</div>
-      <p class="text-xs opacity-80 leading-relaxed">
-        Durable Objects manage live WebSockets, presence, and transient state with zero infrastructure setup.
+      <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400">Delegate Stateful Edge Paths</div>
+      <div class="font-semibold text-base mt-1">Durable Objects Sidecar</div>
+      <p class="text-xs opacity-90 mt-2">
+        Route real-time, presence, and lock-sensitive features directly to a Worker + Durable Object:
       </p>
+      <div class="flex flex-wrap gap-1.5 mt-3">
+        <span class="cf-pill">Live Chat & Presence</span>
+        <span class="cf-pill">Multiplayer Cursors</span>
+        <span class="cf-pill">AI Agent State</span>
+        <span class="cf-pill">Per-Tenant Locks</span>
+      </div>
     </div>
-    <div class="mt-3 text-xs font-mono text-orange-600 dark:text-orange-400">
-      Sidecar pattern
-    </div>
-  </div>
-
-  <div class="cf-panel flex flex-col justify-between">
-    <div>
-      <div class="font-mono text-xs text-slate-500 font-bold mb-2">DURABLE SYNC</div>
-      <div class="font-semibold text-sm mb-1">Periodic Flush</div>
-      <p class="text-xs opacity-80 leading-relaxed">
-        DO flushes completed transcripts or summarized events to your primary Postgres DB via REST or webhooks.
-      </p>
-    </div>
-    <div class="mt-3 text-xs font-mono opacity-60">
-      Best of both worlds
+    <div class="pt-3 mt-4 border-t border-orange-500/30 text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">
+      Best for: WebSockets, coordination, zero-lock state
     </div>
   </div>
 </div>
 
 <!--
-Adoption strategy:
-- You don't need a total rewrite.
-- Use Durable Objects as a real-time sidecar alongside your existing Rails, Next.js, or Go backend.
-- The DO manages the live connections and periodically flushes state to Postgres.
+Durable Objects can be adopted incrementally as a specialized coordination tier alongside an existing Postgres/Rails/Next.js stack.
+Use them surgically for real-time collaboration, cursors, presence, and stateful agents.
 -->
 
 ---
 
-<div class="cf-eyebrow">Summary</div>
+<div class="cf-eyebrow">Summary · Cheat Sheet</div>
 
 ## Durable Objects in Four Rules
 
-<p class="cf-subtitle">
-  Everything you need to remember about when and how to build with Durable Objects.
-</p>
-
 <div class="grid grid-cols-2 gap-4 mt-6">
-  <div class="cf-panel flex flex-col justify-between">
-    <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">RULE 01</div>
-      <div class="font-semibold text-sm mt-1">One ID = One Instance Globally</div>
-      <p class="text-xs opacity-80 mt-1.5 leading-relaxed">
-        <code>idFromName("room-123")</code> routes to the exact same isolate worldwide. Deterministic coordination without distributed locks.
-      </p>
-    </div>
+  <div class="cf-panel py-4 flex flex-col justify-center">
+    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">01 · ADDRESSING</div>
+    <div class="font-semibold text-base mt-1.5">One ID = One Global Instance</div>
   </div>
 
-  <div class="cf-panel flex flex-col justify-between">
-    <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">RULE 02</div>
-      <div class="font-semibold text-sm mt-1">Single-Threaded Execution</div>
-      <p class="text-xs opacity-80 mt-1.5 leading-relaxed">
-        Events run sequentially within each object. State changes and embedded SQLite queries execute safely with zero race conditions.
-      </p>
-    </div>
+  <div class="cf-panel py-4 flex flex-col justify-center">
+    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">02 · PERSISTENCE</div>
+    <div class="font-semibold text-base mt-1.5">Private SQLite on the Same Thread</div>
   </div>
 
-  <div class="cf-panel flex flex-col justify-between">
-    <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">RULE 03</div>
-      <div class="font-semibold text-sm mt-1">Hibernate to Eliminate Idle Costs</div>
-      <p class="text-xs opacity-80 mt-1.5 leading-relaxed">
-        Use <code>ctx.acceptWebSocket()</code> so Cloudflare holds TCP connections while the isolate sleeps. Pay $0 for idle connection RAM.
-      </p>
-    </div>
+  <div class="cf-panel py-4 flex flex-col justify-center">
+    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · REAL-TIME</div>
+    <div class="font-semibold text-base mt-1.5">Hibernatable WebSockets</div>
   </div>
 
-  <div class="cf-panel flex flex-col justify-between">
-    <div>
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">RULE 04</div>
-      <div class="font-semibold text-sm mt-1">Partition by Entity, Not Globally</div>
-      <p class="text-xs opacity-80 mt-1.5 leading-relaxed">
-        Scale horizontally by scoping objects to natural entities (rooms, documents, carts). Never funnel your entire app into one singleton.
-      </p>
-    </div>
+  <div class="cf-panel py-4 flex flex-col justify-center">
+    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">04 · ARCHITECTURE</div>
+    <div class="font-semibold text-base mt-1.5">Partition Granularly, Adopt Surgically</div>
   </div>
 </div>
 
+<div class="cf-panel-accent mt-4 flex items-center justify-between text-xs">
+  <span>
+    <strong>Watch the source video:</strong>
+    <a href="https://www.youtube.com/watch?v=k4UXEfZf3sc" target="_blank" rel="noreferrer" class="underline ml-1">
+      Cloudflare Developers — Durable Objects Finally Make Sense
+    </a>
+  </span>
+  <span class="font-mono">Docs: developers.cloudflare.com/durable-objects</span>
+</div>
+
 <!--
-Key takeaways:
-1. One ID = One Object worldwide.
-2. Single-threaded model removes race conditions.
-3. Hibernation makes WebSockets cost-effective.
-4. Scale horizontally by partitioning.
+Summary:
+1. One ID = One global instance.
+2. Embedded SQLite gives zero-hop persistence.
+3. Hibernatable WebSockets provide cost-effective real-time fanout.
+4. Partition per entity and adopt surgically alongside your primary stack.
 -->
 
 ---
-layout: center
-class: text-center
----
 
-<div class="cf-eyebrow justify-center">Discussion &amp; Deep Dive</div>
-
-# Questions & Next Steps
-
-<p class="text-lg opacity-80 max-w-lg mx-auto mt-2">
-  Explore the live demos or dive into the Cloudflare docs to start building stateful primitives.
-</p>
-
-<div class="grid grid-cols-3 gap-3.5 mt-8 max-w-2xl mx-auto text-left">
-  <div class="cf-panel" v-click>
-    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">Q: WHAT ABOUT LATENCY?</div>
-    <div class="font-semibold text-xs mt-1">Where Does the DO Run?</div>
-    <p class="text-[11px] opacity-75 mt-1.5 leading-relaxed">
-      Spins up near the first request or can be pinned via <code>locationHint</code> (e.g. <code>wnam</code>, <code>eeur</code>).
-    </p>
+<div class="h-full flex flex-col justify-between py-4">
+  <div>
+    <div class="cf-eyebrow">Discussion &amp; Q&amp;A</div>
+    <h1 class="!text-5xl !leading-tight mt-2">
+      Questions?
+    </h1>
   </div>
 
-  <div class="cf-panel" v-click>
-    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">Q: MEMORY LIMITS?</div>
-    <div class="font-semibold text-xs mt-1">128 MB Heap Ceiling</div>
-    <p class="text-[11px] opacity-75 mt-1.5 leading-relaxed">
-      In-memory JS state has a 128 MB limit. Large datasets should be stored in the private SQLite database.
-    </p>
+  <div v-click class="mt-4">
+    <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400 font-bold mb-3">
+      Common Architectural Inquiries
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="cf-panel">
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">Where does an instance physically live?</div>
+        <p class="text-xs opacity-80 mt-1">
+          Spawned in the data center closest to the first request (or pinned to a specific jurisdiction/region). Callers route directly to it globally.
+        </p>
+      </div>
+      <div class="cf-panel">
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">How do we handle the 128 MB memory limit?</div>
+        <p class="text-xs opacity-80 mt-1">
+          Never buffer large payloads in RAM. Use <strong>streaming</strong> (<code>ReadableStream</code> / chunked WebSockets) so bytes pass through in small buffers, and persist history to embedded SQLite.
+        </p>
+      </div>
+      <div class="cf-panel">
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">What is the throughput ceiling &amp; concurrency model?</div>
+        <p class="text-xs opacity-80 mt-1">
+          Single-threaded execution guarantees lock-free consistency (~1,000 req/sec ceiling). Scale horizontally by partitioning IDs (per room, per doc).
+        </p>
+      </div>
+      <div class="cf-panel">
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">How do we run cross-room queries or analytics?</div>
+        <p class="text-xs opacity-80 mt-1">
+          DOs are isolated coordination shards. Checkpoint data or stream mutation events to D1, Postgres, or an analytical warehouse for reporting.
+        </p>
+      </div>
+    </div>
   </div>
 
-  <div class="cf-panel" v-click>
-    <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">Q: LARGE BROADCASTS?</div>
-    <div class="font-semibold text-xs mt-1">1,000+ Sockets per Room</div>
-    <p class="text-[11px] opacity-75 mt-1.5 leading-relaxed">
-      For 100k+ spectator streams, fan out through Cloudflare Pub/Sub or Workers instead of 1 DO.
-    </p>
-  </div>
-</div>
-
-<div class="mt-8 flex justify-center gap-4 text-xs font-mono">
-  <span class="opacity-60">developers.cloudflare.com/durable-objects</span>
 </div>
 
 <!--
-Q&A wrap up:
-- Address common architectural questions: geolocation/latency, memory boundaries, and broadcast limits.
+Start by pausing and inviting questions from the audience.
+When ready, press Space or Right-Arrow to reveal the four most common architectural questions.
 -->
