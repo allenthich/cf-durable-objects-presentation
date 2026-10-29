@@ -255,7 +255,8 @@ Inside ChatRoom:
       <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400">Durable Object Architecture</div>
       <div class="font-semibold text-sm mt-1">1 Self-Contained Instance per Room</div>
       <ul class="text-xs space-y-1.5 mt-2">
-        <li><strong>Colocated coordination:</strong> Same instance holds room WebSockets</li>
+        <li><strong>Colocated coordination:</strong> Same instance holds active room WebSockets</li>
+        <li><strong>Single-threaded & synchronous:</strong> Lock-free consistency (constraint: ~1k req/s per entity)</li>
         <li><strong>Private SQLite:</strong> Disk-backed SQL bypasses 128 MB isolate RAM limit</li>
         <li><strong>Hibernation:</strong> Sockets stay open while idle instances sleep at $0</li>
         <li><strong>Zero Redis:</strong> No pub/sub fleet needed for in-room fanout</li>
@@ -267,16 +268,7 @@ Inside ChatRoom:
   </div>
 </div>
 
-<div class="mt-3">
 
-```ts
-// Forward WebSocket upgrades directly to the room's Durable Object:
-if (url.pathname === `/rooms/${roomId}/ws` && request.headers.get("Upgrade") === "websocket") {
-  return stub.fetch(request);
-}
-```
-
-</div>
 
 <!--
 Architectural comparison:
