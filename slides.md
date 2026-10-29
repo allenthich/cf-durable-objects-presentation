@@ -10,38 +10,20 @@ mdc: true
 colorSchema: auto
 ---
 
-<div class="h-full flex flex-col justify-between py-4">
-  <div>
+<div class="h-full flex flex-col justify-between py-8">
+  <div class="my-auto">
     <div class="cf-eyebrow">Cloudflare Primitives · Practical Guide</div>
-    <h1 class="!text-5xl !leading-tight max-w-3xl mt-2">
+    <h1 class="!text-6xl !leading-tight max-w-3xl mt-3">
       Cloudflare Durable Objects
     </h1>
-    <p class="text-xl opacity-75 max-w-2xl mt-3">
+    <p class="text-2xl opacity-75 max-w-2xl mt-4 leading-relaxed">
       Stateful serverless coordination, private SQLite, and real-time WebSockets—without extra infrastructure.
     </p>
   </div>
 
-  <div class="grid grid-cols-3 gap-4 mt-8">
-    <div class="cf-panel">
-      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Mental Model</div>
-      <div class="font-semibold text-sm mt-1">One ID = One Instance</div>
-      <div class="text-xs opacity-70 mt-1">Single coordination point per room, document, or session.</div>
-    </div>
-    <div class="cf-panel">
-      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Storage</div>
-      <div class="font-semibold text-sm mt-1">Co-located SQLite</div>
-      <div class="text-xs opacity-70 mt-1">Zero-latency, strongly consistent SQL on the same thread.</div>
-    </div>
-    <div class="cf-panel">
-      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Real-Time</div>
-      <div class="font-semibold text-sm mt-1">Hibernatable WebSockets</div>
-      <div class="text-xs opacity-70 mt-1">Idle instances sleep at 0 MB RAM while sockets stay open.</div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-between text-xs opacity-60 pt-4 border-t border-slate-500/20">
+  <div class="text-xs opacity-60 pt-4 border-t border-slate-500/20">
     <span>Reference: Cloudflare Developers — <em>Durable Objects Finally Make Sense</em></span>
-    </div>
+  </div>
 </div>
 
 <!--
