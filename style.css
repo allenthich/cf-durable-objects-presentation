@@ -1,0 +1,110 @@
+:root {
+  --cf-accent: #ea580c;
+  --cf-accent-soft: rgba(234, 88, 12, 0.1);
+  --cf-accent-border: rgba(234, 88, 12, 0.32);
+  --cf-surface: #f8fafc;
+  --cf-surface-elevated: #ffffff;
+  --cf-border: #e2e8f0;
+  --cf-text: #0f172a;
+  --cf-muted: #475569;
+  --cf-success: #15803d;
+  --cf-success-soft: rgba(21, 128, 61, 0.1);
+  --cf-danger: #b91c1c;
+  --cf-danger-soft: rgba(185, 28, 28, 0.08);
+}
+
+html.dark {
+  --cf-accent: #fb923c;
+  --cf-accent-soft: rgba(251, 146, 60, 0.12);
+  --cf-accent-border: rgba(251, 146, 60, 0.35);
+  --cf-surface: #111827;
+  --cf-surface-elevated: #1e293b;
+  --cf-border: #334155;
+  --cf-text: #f8fafc;
+  --cf-muted: #94a3b8;
+  --cf-success: #4ade80;
+  --cf-success-soft: rgba(74, 222, 128, 0.12);
+  --cf-danger: #f87171;
+  --cf-danger-soft: rgba(248, 113, 113, 0.12);
+}
+
+.slidev-layout {
+  padding: 2.25rem 3rem !important;
+  color: var(--cf-text);
+}
+
+.slidev-layout h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.slidev-layout h2 {
+  font-size: 1.65rem !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-bottom: 0.35rem !important;
+}
+
+.slidev-layout p {
+  line-height: 1.5;
+}
+
+.cf-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--slidev-code-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cf-accent);
+  margin-bottom: 0.375rem;
+}
+
+.cf-subtitle {
+  font-size: 0.95rem;
+  color: var(--cf-muted);
+  margin-top: 0 !important;
+  margin-bottom: 1.1rem !important;
+}
+
+.cf-panel {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+}
+
+.cf-panel-accent {
+  background: var(--cf-accent-soft);
+  border: 1px solid var(--cf-accent-border);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+}
+
+.cf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--cf-surface-elevated);
+  border: 1px solid var(--cf-border);
+  color: var(--cf-text);
+}
+
+.slidev-code-wrapper {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.slidev-code {
+  font-size: 0.78rem !important;
+  line-height: 1.45 !important;
+}
