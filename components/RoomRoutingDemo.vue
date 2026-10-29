@@ -33,7 +33,7 @@ const grouped = computed(() => ({
   <div class="routing-grid" role="region" aria-label="Interactive Durable Object routing simulator">
     <div class="cf-panel">
       <div class="panel-header">
-        <span class="panel-label">1. Incoming Requests at Nearest Edge</span>
+        <span class="panel-label">1. Client Requests at Edge</span>
         <span class="panel-hint">Click a room to re-route</span>
       </div>
 
@@ -62,7 +62,7 @@ const grouped = computed(() => ({
 
       <div class="code-callout">
         <code>env.CHAT_ROOM.idFromName(roomId)</code>
-        <span>Same name &rarr; deterministic global ID</span>
+        <span>Same name &rarr; same instance</span>
       </div>
     </div>
 
@@ -90,12 +90,12 @@ const grouped = computed(() => ({
               {{ peer.name }} ({{ peer.colo.split(' · ')[0] }})
             </span>
           </template>
-          <span v-else class="empty-note">Idle — no active callers</span>
+          <span v-else class="empty-note">Idle — 0 active callers</span>
         </div>
 
         <div class="storage-bar">
           <span>Private SQLite: <code>{{ r }}.sqlite</code></span>
-          <span>Single-threaded execution</span>
+          <span>Single-threaded</span>
         </div>
       </div>
     </div>

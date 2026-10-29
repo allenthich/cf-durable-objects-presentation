@@ -23,7 +23,7 @@ const phases: PhaseInfo[] = [
     doStatus: 'AWAKE IN MEMORY',
     doDetail: 'Processes messages & saves to disk',
     costBadge: 'Billing: Active',
-    caption: 'While people are actively chatting, messages flow straight through the runtime host to the Durable Object.',
+    caption: 'Active chat: messages flow directly through the runtime host to the Durable Object.',
   },
   {
     id: 'hibernating',
@@ -31,9 +31,9 @@ const phases: PhaseInfo[] = [
     label: 'Room Goes Quiet (Hibernating)',
     hostToDoLabel: 'Paused — nothing to forward',
     doStatus: 'ASLEEP (UNLOADED)',
-    doDetail: 'Removed from memory while room is silent',
+    doDetail: 'Evicted from RAM while room is silent',
     costBadge: 'Billing: $0',
-    caption: 'Nobody is typing: the runtime host keeps every browser socket open, while the Durable Object sleeps for free.',
+    caption: 'Idle room: the host keeps all sockets open while the Durable Object unloads at $0 cost.',
   },
   {
     id: 'waking',
@@ -43,7 +43,7 @@ const phases: PhaseInfo[] = [
     doStatus: 'WAKES INSTANTLY',
     doDetail: 'Reloads state & broadcasts to room',
     costBadge: 'Billing: Active',
-    caption: 'As soon as anyone speaks, the runtime host wakes the Durable Object in milliseconds—users never reconnect.',
+    caption: 'New message: the host wakes the Durable Object in milliseconds to persist and broadcast.',
   },
 ]
 
@@ -102,7 +102,7 @@ const isSleeping = computed(() => current.value === 'hibernating')
           <div class="node-eyebrow">Runtime Host</div>
           <div class="node-title">Connection Manager</div>
           <p class="node-desc">
-            Holds the open socket for every user in lightweight native memory, even when the room is silent.
+            Holds open WebSockets in lightweight native memory while instances sleep.
           </p>
           <div class="node-foot">2 active sockets held</div>
         </div>
