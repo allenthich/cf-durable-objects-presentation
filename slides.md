@@ -92,14 +92,73 @@ Overview of Cloudflare Durable Objects in four parts:
 </div>
 
 <div class="cf-panel mt-5 flex items-center justify-between text-sm">
-  <span><strong>Core Definition:</strong> An addressable micro-server instantiated on demand per unique ID.</span>
-  <span class="cf-pill">Strong Consistency</span>
+  <span><strong>The Solution:</strong> A stateful serverless function combining compute, state, and coordination.</span>
+  <span class="cf-pill">Next: Anatomy &amp; Constraints</span>
 </div>
 
 <!--
 Stateless Workers run across hundreds of PoPs without shared memory.
 Databases persist state on disk, but cannot serialize concurrent edits or track active connections without extra infra like Redis.
 A Durable Object fills this gap: one instance per entity with private storage and in-memory state.
+-->
+
+
+---
+
+<div class="cf-eyebrow">01 · The Primitive</div>
+
+## Anatomy of a Durable Object
+
+<p class="cf-subtitle">
+  A stateful serverless function combining deterministic routing, single-threaded execution, and private storage.
+</p>
+
+<div class="grid grid-cols-3 gap-4 mt-5">
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">01 · ADDRESSING</div>
+      <div class="font-semibold text-base mt-1">Deterministic ID Routing</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Resolved globally by string name or unique ID (<code>idFromName("room_general")</code>). Every caller globally reaches the exact same coordinator.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-75">
+      One ID = One Global Instance
+    </div>
+  </div>
+
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">02 · EXECUTION</div>
+      <div class="font-semibold text-base mt-1">Single-Threaded Execution</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Executes synchronously on one thread. Eliminates concurrency race conditions by design without locks (throughput constraint: ~1,000 req/s per entity).
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-75">
+      Lock-Free Strong Consistency
+    </div>
+  </div>
+
+  <div class="cf-panel-accent flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · STORAGE &amp; RAM</div>
+      <div class="font-semibold text-base mt-1">128 MB RAM + Private SQLite</div>
+      <p class="text-xs opacity-90 mt-2 leading-relaxed">
+        Subject to a 128 MB V8 isolate heap ceiling. Use RAM as a lean cache, stream large payloads, and persist state to zero-latency, disk-backed SQLite.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-orange-500/30 text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">
+      Zero-Hop Disk Persistence
+    </div>
+  </div>
+</div>
+
+<!--
+The three core pillars of a Durable Object:
+1. Deterministic Addressing: One ID = One global instance.
+2. Single-Threaded Execution: Sequential execution guarantees strong consistency without distributed locks. (Constraint: ~1k req/s).
+3. Memory & Storage: 128 MB heap ceiling is respected by treating RAM as an ephemeral cache and storing durable state in co-located SQLite.
 -->
 
 ---
@@ -238,8 +297,8 @@ Inside ChatRoom:
       <div class="font-semibold text-sm mt-1">1 Self-Contained Instance per Room</div>
       <ul class="text-xs space-y-1.5 mt-2">
         <li><strong>Colocated coordination:</strong> Same instance holds active room WebSockets</li>
-        <li><strong>Single-threaded & synchronous:</strong> Lock-free consistency (constraint: ~1k req/s per entity)</li>
-        <li><strong>Private SQLite:</strong> Disk-backed SQL bypasses 128 MB isolate RAM limit</li>
+        <li><strong>Lock-free consistency:</strong> Single-threaded execution eliminates race conditions</li>
+        <li><strong>Private SQLite:</strong> Zero-latency SQL persistence on the exact same thread</li>
         <li><strong>Hibernation:</strong> Sockets stay open while idle instances sleep at $0</li>
         <li><strong>Zero Redis:</strong> No pub/sub fleet needed for in-room fanout</li>
       </ul>
