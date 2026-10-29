@@ -34,6 +34,79 @@ Overview of Cloudflare Durable Objects in four parts:
 4. Partitioning patterns and selective adoption.
 -->
 
+
+---
+
+<div class="cf-eyebrow">01 · Background</div>
+
+## Real-Time Scaling Evolution
+
+<p class="cf-subtitle">
+  How building a simple collaborative feature gradually turns into an infrastructure management problem.
+</p>
+
+<div class="grid grid-cols-4 gap-3.5 mt-5 items-stretch">
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">01 · HTTP POLLING</div>
+      <div class="font-semibold text-sm mt-1">Manual Refresh / Interval</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Clients repeatedly query <code>GET /messages</code> every few seconds. Database is flooded with redundant reads while state is always stale.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-70">
+      ✗ Stale data &amp; high DB load
+    </div>
+  </div>
+
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">02 · WEBSOCKETS</div>
+      <div class="font-semibold text-sm mt-1">Single-Server Fanout</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Upgrade HTTP to WebSockets. In-memory array pushes events instantly. Works seamlessly on a single developer machine for small local rooms.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-70">
+      ✗ Doesn't scale past 1 node
+    </div>
+  </div>
+
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · MULTI-SERVER</div>
+      <div class="font-semibold text-sm mt-1">The Multi-Pod Wall</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Adding load balancers isolates clients: Alice lands on Node A, Bob lands on Node B. Node A cannot broadcast to Bob's socket.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-70">
+      ✗ Sockets isolated across nodes
+    </div>
+  </div>
+
+  <div class="cf-panel flex flex-col justify-between" style="border-color: rgba(239, 68, 68, 0.35);">
+    <div>
+      <div class="font-mono text-xs text-red-500 font-bold">04 · PUB/SUB FLEET</div>
+      <div class="font-semibold text-sm mt-1 text-red-600 dark:text-red-400">Infrastructure Sprawl</div>
+      <p class="text-xs opacity-80 mt-2 leading-relaxed">
+        Must deploy dedicated WebSocket fleets, a Redis pub/sub backplane, connection brokers, and pay for idle RAM across thousands of connections.
+      </p>
+    </div>
+    <div class="mt-4 pt-3 border-t border-red-500/25 text-xs font-mono opacity-80 text-red-600 dark:text-red-400">
+      ✗ High ops &amp; idle RAM cost
+    </div>
+  </div>
+</div>
+
+<!--
+The scaling journey every backend team experiences:
+1. Polling: Simple, but spams the database and delivers stale UX.
+2. Single-Server WebSockets: Great in local dev; breaks the moment you deploy multiple pods.
+3. Multi-Server Wall: Load balancers scatter room participants across different machines.
+4. Infrastructure Sprawl: You wanted a simple chat room; you ended up maintaining a multi-tier WebSocket cluster, Redis pub/sub, connection brokers, and paying high idle compute bills.
+-->
+
 ---
 
 <div class="cf-eyebrow">01 · The Core Problem</div>
@@ -91,10 +164,7 @@ Overview of Cloudflare Durable Objects in four parts:
   </div>
 </div>
 
-<div class="cf-panel mt-5 flex items-center justify-between text-sm">
-  <span><strong>The Solution:</strong> A stateful serverless function combining compute, state, and coordination.</span>
-  <span class="cf-pill">Next: Anatomy &amp; Constraints</span>
-</div>
+
 
 <!--
 Stateless Workers run across hundreds of PoPs without shared memory.
