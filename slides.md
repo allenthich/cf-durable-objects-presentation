@@ -236,7 +236,7 @@ A Durable Object fills this gap: one instance per entity with private storage an
     </div>
   </div>
 
-  <div class="cf-panel-accent flex flex-col justify-between">
+  <div class="cf-panel flex flex-col justify-between">
     <div>
       <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · STORAGE &amp; RAM</div>
       <div class="font-semibold text-base mt-1">128 MB RAM + Private SQLite</div>
@@ -244,7 +244,7 @@ A Durable Object fills this gap: one instance per entity with private storage an
         Subject to a 128 MB V8 isolate heap ceiling. Use RAM as a lean cache, stream large payloads, and persist state to zero-latency, disk-backed SQLite.
       </p>
     </div>
-    <div class="mt-4 pt-3 border-t border-orange-500/30 text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">
+    <div class="mt-4 pt-3 border-t border-slate-500/20 text-xs font-mono opacity-75">
       Zero-Hop Disk Persistence
     </div>
   </div>
@@ -446,7 +446,7 @@ Key concept:
 ````md magic-move {lines: true}
 ```ts
 export class ChatRoom extends DurableObject<Env> {
-  // 1. Accept WebSocket & enable hibernation
+  // 1. HTTP 101 upgrade handshake (runtime requires fetch() for WS upgrades)
   async fetch(request: Request): Promise<Response> {
     const [client, server] = Object.values(new WebSocketPair());
 
@@ -481,8 +481,10 @@ export class ChatRoom extends DurableObject<Env> {
 ````
 
 <!--
-First step: ctx.acceptWebSocket(server) registers the socket with the host runtime. When traffic stops, the object unloads from RAM without dropping clients.
-Second step: When a message arrives, the object wakes, invokes webSocketMessage(), writes to SQLite, and broadcasts across this.ctx.getWebSockets().
+Why fetch() instead of connect()?
+WebSockets begin as an HTTP GET request with an "Upgrade: websocket" header. Because raw WebSocket instances cannot be serialized across the Workers RPC boundary, Cloudflare requires stub.fetch(request) to perform the HTTP 101 Switching Protocols handshake.
+1. ctx.acceptWebSocket(server) registers the socket with the host runtime so it stays open during hibernation.
+2. When a frame arrives, the DO wakes, invokes webSocketMessage(), updates SQLite, and broadcasts via this.ctx.getWebSockets().
 -->
 
 ---
