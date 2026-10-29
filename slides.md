@@ -128,7 +128,7 @@ A Durable Object fills this gap: one instance per entity with private storage an
 ## The Golden Rule: `One ID = One Durable Object`
 
 <p class="cf-subtitle">
-  All requests for <code>"general"</code> route to the same instance. A different ID gets its own isolated instance.
+  Deterministic global routing: callers using the same ID reach the exact same coordinator.
 </p>
 
 <RoomRoutingDemo />
@@ -230,10 +230,10 @@ Inside ChatRoom:
 
 <div class="cf-eyebrow">03 · Real-Time Coordination</div>
 
-## Adding WebSockets—Without Redis or Extra Clusters
+## Real-Time Architecture
 
 <p class="cf-subtitle">
-  Because all users in a room connect to the same instance, it coordinates WebSockets directly.
+  Eliminate the dedicated WebSocket fleet and Redis pub/sub backplane with a single coordination primitive.
 </p>
 
 <div class="grid grid-cols-2 gap-4 mt-2">
@@ -370,10 +370,10 @@ Runtime behavior:
 
 <div class="cf-eyebrow">04 · Architectural Best Practices</div>
 
-## Partition by Coordination Boundary—Never Centralize
+## Partitioning & Concurrency Model
 
 <p class="cf-subtitle">
-  Durable Objects are single-threaded. Scale horizontally with many small instances, not one global bottleneck.
+  Single-threaded execution guarantees consistency within a 128 MB memory ceiling. Scale horizontally across IDs.
 </p>
 
 <div class="grid grid-cols-2 gap-5 mt-3">
@@ -410,18 +410,19 @@ Runtime behavior:
 </div>
 
 <!--
-Single-threading guarantees lock-free consistency within an instance.
-To scale, partition by entity: 10,000 active rooms run across 10,000 parallel Durable Objects and SQLite databases.
+Single-threaded execution guarantees lock-free consistency within an instance, eliminating concurrency races.
+Each instance has a 128 MB memory limit: keep RAM lean, offload state to SQLite, and stream large payloads rather than buffering.
+To scale, partition by entity: 10,000 active rooms run across 10,000 parallel Durable Objects.
 -->
 
 ---
 
 <div class="cf-eyebrow">04 · Practical Adoption</div>
 
-## Selective Adoption: Use Durable Objects Surgically
+## Integration Strategy
 
 <p class="cf-subtitle">
-  You don't need a full migration. Adopt Durable Objects only where stateful coordination is needed.
+  Run Durable Objects as a specialized coordination tier alongside your existing database and APIs.
 </p>
 
 <div class="grid grid-cols-12 gap-4 mt-3 items-stretch">
@@ -529,9 +530,6 @@ Summary:
     <h1 class="!text-5xl !leading-tight mt-2">
       Questions?
     </h1>
-    <p class="text-lg opacity-75 mt-3">
-      Floor is open for questions, architectural considerations, and discussion.
-    </p>
   </div>
 
   <div v-click class="mt-4">
@@ -542,19 +540,19 @@ Summary:
       <div class="cf-panel">
         <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">Where does an instance physically live?</div>
         <p class="text-xs opacity-80 mt-1">
-          Spawned in the data center nearest to the first request (or pinned to a specific jurisdiction/region). All global traffic for that ID routes directly to it.
+          Spawned in the data center closest to the first request (or pinned to a specific jurisdiction/region). Callers route directly to it globally.
         </p>
       </div>
       <div class="cf-panel">
-        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">What happens to in-memory state on hibernation?</div>
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">How do we handle the 128 MB memory limit?</div>
         <p class="text-xs opacity-80 mt-1">
-          JS heap memory is evicted. Treat in-memory variables as an ephemeral cache; use embedded SQLite as durable source of truth.
+          Never buffer large payloads in RAM. Use <strong>streaming</strong> (<code>ReadableStream</code> / chunked WebSockets) so bytes pass through in small buffers, and persist history to embedded SQLite.
         </p>
       </div>
       <div class="cf-panel">
-        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">What is the maximum throughput per instance?</div>
+        <div class="font-semibold text-sm text-orange-600 dark:text-orange-400">What is the throughput ceiling &amp; concurrency model?</div>
         <p class="text-xs opacity-80 mt-1">
-          Because each instance is single-threaded, throughput tops out at ~1,000 req/sec. Scale horizontally by partitioning IDs (per room, per doc).
+          Single-threaded execution guarantees lock-free consistency (~1,000 req/sec ceiling). Scale horizontally by partitioning IDs (per room, per doc).
         </p>
       </div>
       <div class="cf-panel">
