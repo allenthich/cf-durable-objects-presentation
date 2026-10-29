@@ -184,43 +184,57 @@ The Worker resolves the room ID, gets the stub, and calls stub.getMessages() or 
 ## Step 2: Persist State Inside the `ChatRoom` Class
 
 <p class="cf-subtitle">
-  Initialize schema on startup, then query SQLite synchronously inside RPC methods.
+  Query private SQLite synchronously inside RPC methods without network hops.
 </p>
 
-```ts {1-12|14-24|all}
-import { DurableObject } from "cloudflare:workers";
+<div class="grid grid-cols-12 gap-5 items-start mt-2">
+  <div class="col-span-7">
 
+```ts {1-8|10-12|14-17|all}
 export class ChatRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    ctx.blockConcurrencyWhile(async () => {
-      ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS messages (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, text TEXT
-        )
-      `);
-    });
+    ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, text TEXT
+      )
+    `);
   }
 
   async getMessages() {
-    return this.ctx.storage.sql.exec("SELECT * FROM messages ORDER BY id ASC").toArray();
+    return this.ctx.storage.sql.exec("SELECT * FROM messages").toArray();
   }
 
   async sendMessage(sender: string, text: string) {
-    this.ctx.storage.sql.exec("INSERT INTO messages (sender, text) VALUES (?, ?)", sender, text);
+    this.ctx.storage.sql.exec("INSERT INTO messages VALUES (?, ?)", sender, text);
     return { ok: true };
   }
 }
 ```
 
-<div class="grid grid-cols-2 gap-3 mt-3 text-xs">
-  <div class="cf-panel">
-    <span class="font-semibold text-orange-600 dark:text-orange-400">Memory vs. Storage:</span>
-    <span class="opacity-80 ml-1">In-memory JS state has a 128 MB isolate heap ceiling. SQLite runs on the same thread with disk-backed durability.</span>
   </div>
-  <div class="cf-panel flex items-center justify-between">
-    <span><strong>Limitation:</strong> Clients must poll for updates.</span>
-    <span class="cf-pill">Next: WebSockets</span>
+
+  <div class="col-span-5 flex flex-col gap-3.5">
+    <div class="cf-panel">
+      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">MEMORY VS. STORAGE</div>
+      <div class="font-semibold text-sm mt-1">128 MB Isolate Limit</div>
+      <p class="text-xs opacity-80 mt-1.5">
+        In-memory JS state is subject to a 128 MB isolate heap ceiling. Embedded SQLite provides strongly consistent, disk-backed persistence on the same thread without eating RAM.
+      </p>
+    </div>
+
+    <div class="cf-panel flex flex-col justify-between">
+      <div>
+        <div class="font-mono text-xs text-slate-500 font-bold">CURRENT LIMITATION</div>
+        <div class="font-semibold text-sm mt-1">Polling Required</div>
+        <p class="text-xs opacity-80 mt-1.5">
+          Persistence works, but clients must poll for updates. Next, we add real-time push.
+        </p>
+      </div>
+      <div class="mt-3 pt-2 border-t border-slate-500/20 flex justify-end">
+        <span class="cf-pill">Next: WebSockets</span>
+      </div>
+    </div>
   </div>
 </div>
 
