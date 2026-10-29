@@ -475,37 +475,25 @@ Use them surgically for real-time collaboration, cursors, presence, and stateful
 
 ## Durable Objects in Four Rules
 
-<div class="grid grid-cols-2 gap-3.5 mt-4">
-  <div class="cf-panel">
+<div class="grid grid-cols-2 gap-4 mt-6">
+  <div class="cf-panel py-4 flex flex-col justify-center">
     <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">01 · ADDRESSING</div>
-    <div class="font-semibold text-sm mt-1">One ID = One Global Instance</div>
-    <p class="text-xs opacity-80 mt-1">
-      <code>idFromName(id)</code> routes all callers to the same single-threaded coordinator.
-    </p>
+    <div class="font-semibold text-base mt-1.5">One ID = One Global Instance</div>
   </div>
 
-  <div class="cf-panel">
+  <div class="cf-panel py-4 flex flex-col justify-center">
     <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">02 · PERSISTENCE</div>
-    <div class="font-semibold text-sm mt-1">Private SQLite on the Same Thread</div>
-    <p class="text-xs opacity-80 mt-1">
-      <code>ctx.storage.sql.exec()</code> runs strongly consistent SQL on the exact same thread.
-    </p>
+    <div class="font-semibold text-base mt-1.5">Private SQLite on the Same Thread</div>
   </div>
 
-  <div class="cf-panel">
+  <div class="cf-panel py-4 flex flex-col justify-center">
     <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">03 · REAL-TIME</div>
-    <div class="font-semibold text-sm mt-1">Hibernatable WebSockets</div>
-    <p class="text-xs opacity-80 mt-1">
-      <code>ctx.acceptWebSocket()</code> keeps client sockets open while idle instances sleep for free.
-    </p>
+    <div class="font-semibold text-base mt-1.5">Hibernatable WebSockets</div>
   </div>
 
-  <div class="cf-panel">
+  <div class="cf-panel py-4 flex flex-col justify-center">
     <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">04 · ARCHITECTURE</div>
-    <div class="font-semibold text-sm mt-1">Partition Granularly, Adopt Surgically</div>
-    <p class="text-xs opacity-80 mt-1">
-      Partition per room, document, or session. Never funnel global traffic through one ID.
-    </p>
+    <div class="font-semibold text-base mt-1.5">Partition Granularly, Adopt Surgically</div>
   </div>
 </div>
 
