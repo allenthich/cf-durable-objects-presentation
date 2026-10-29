@@ -23,7 +23,6 @@ const phases: PhaseInfo[] = [
     doStatus: 'AWAKE IN MEMORY',
     doDetail: 'Processes messages & saves to disk',
     costBadge: 'Billing: Active',
-    caption: 'Active chat: messages flow directly through the runtime host to the Durable Object.',
   },
   {
     id: 'hibernating',
@@ -33,7 +32,6 @@ const phases: PhaseInfo[] = [
     doStatus: 'ASLEEP (UNLOADED)',
     doDetail: 'Evicted from RAM while room is silent',
     costBadge: 'Billing: $0',
-    caption: 'Idle room: the host keeps all sockets open while the Durable Object unloads at $0 cost.',
   },
   {
     id: 'waking',
@@ -43,7 +41,6 @@ const phases: PhaseInfo[] = [
     doStatus: 'WAKES INSTANTLY',
     doDetail: 'Reloads state & broadcasts to room',
     costBadge: 'Billing: Active',
-    caption: 'New message: the host wakes the Durable Object in milliseconds to persist and broadcast.',
   },
 ]
 
@@ -142,9 +139,6 @@ const isSleeping = computed(() => current.value === 'hibernating')
         </div>
       </div>
 
-      <div class="caption-bar">
-        {{ activePhase.caption }}
-      </div>
     </div>
   </div>
 </template>
@@ -432,11 +426,4 @@ const isSleeping = computed(() => current.value === 'hibernating')
   line-height: 1.25;
 }
 
-.caption-bar {
-  padding-top: 0.65rem;
-  border-top: 1px solid var(--cf-border);
-  font-size: 0.8rem;
-  color: var(--cf-text);
-  text-align: center;
-}
 </style>
