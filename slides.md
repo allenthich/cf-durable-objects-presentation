@@ -184,13 +184,12 @@ The Worker resolves the room ID, gets the stub, and calls stub.getMessages() or 
 ## Step 2: Persist State Inside the `ChatRoom` Class
 
 <p class="cf-subtitle">
-  Query private SQLite synchronously inside RPC methods without network hops.
+  Initialize schema on startup, then query SQLite synchronously inside RPC methods.
 </p>
 
-<div class="grid grid-cols-12 gap-5 items-start mt-2">
-  <div class="col-span-7">
+```ts {1-11|13-15|17-20|all}
+import { DurableObject } from "cloudflare:workers";
 
-```ts {1-8|10-12|14-17|all}
 export class ChatRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -202,40 +201,19 @@ export class ChatRoom extends DurableObject<Env> {
   }
 
   async getMessages() {
-    return this.ctx.storage.sql.exec("SELECT * FROM messages").toArray();
+    return this.ctx.storage.sql.exec("SELECT * FROM messages ORDER BY id ASC").toArray();
   }
 
   async sendMessage(sender: string, text: string) {
-    this.ctx.storage.sql.exec("INSERT INTO messages VALUES (?, ?)", sender, text);
+    this.ctx.storage.sql.exec("INSERT INTO messages (sender, text) VALUES (?, ?)", sender, text);
     return { ok: true };
   }
 }
 ```
 
-  </div>
-
-  <div class="col-span-5 flex flex-col gap-3.5">
-    <div class="cf-panel">
-      <div class="font-mono text-xs text-orange-600 dark:text-orange-400 font-bold">MEMORY VS. STORAGE</div>
-      <div class="font-semibold text-sm mt-1">128 MB Isolate Limit</div>
-      <p class="text-xs opacity-80 mt-1.5">
-        In-memory JS state is subject to a 128 MB isolate heap ceiling. Embedded SQLite provides strongly consistent, disk-backed persistence on the same thread without eating RAM.
-      </p>
-    </div>
-
-    <div class="cf-panel flex flex-col justify-between">
-      <div>
-        <div class="font-mono text-xs text-slate-500 font-bold">CURRENT LIMITATION</div>
-        <div class="font-semibold text-sm mt-1">Polling Required</div>
-        <p class="text-xs opacity-80 mt-1.5">
-          Persistence works, but clients must poll for updates. Next, we add real-time push.
-        </p>
-      </div>
-      <div class="mt-3 pt-2 border-t border-slate-500/20 flex justify-end">
-        <span class="cf-pill">Next: WebSockets</span>
-      </div>
-    </div>
-  </div>
+<div class="cf-panel mt-3 flex items-center justify-between text-xs">
+  <span><strong>Limitation:</strong> Persistence works, but clients must <strong>poll or refresh</strong> for updates.</span>
+  <span class="cf-pill">Next: WebSockets</span>
 </div>
 
 <!--
@@ -256,26 +234,36 @@ Inside ChatRoom:
 </p>
 
 <div class="grid grid-cols-2 gap-4 mt-2">
-  <div class="cf-panel">
-    <div class="text-xs font-mono uppercase tracking-wider opacity-60">Typical Architecture</div>
-    <div class="font-semibold text-sm mt-1">4 Components to Synchronize</div>
-    <ul class="text-xs space-y-1.5 mt-2 opacity-85">
-      <li>Stateless API servers + load balancer</li>
-      <li>Dedicated stateful WebSocket gateways</li>
-      <li>Redis Pub/Sub backplane for event fanout</li>
-      <li>External database with connection pooling</li>
-    </ul>
+  <div class="cf-panel flex flex-col justify-between">
+    <div>
+      <div class="text-xs font-mono uppercase tracking-wider opacity-60">Typical Architecture</div>
+      <div class="font-semibold text-sm mt-1">4 Components to Synchronize</div>
+      <ul class="text-xs space-y-1.5 mt-2 opacity-85">
+        <li>Stateless API servers + load balancer</li>
+        <li>Dedicated stateful WebSocket gateways</li>
+        <li>Redis Pub/Sub backplane for event fanout</li>
+        <li>External database with connection pooling</li>
+      </ul>
+    </div>
+    <div class="mt-3 pt-2.5 border-t border-slate-500/20 text-xs opacity-75">
+      <strong>Best for:</strong> Global broadcast (10k+ viewers), massive 1-to-many fanout, cross-table SQL joins.
+    </div>
   </div>
 
-  <div class="cf-panel-accent">
-    <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400">Durable Object Architecture</div>
-    <div class="font-semibold text-sm mt-1">1 Self-Contained Instance per Room</div>
-    <ul class="text-xs space-y-1.5 mt-2">
-      <li><strong>Worker `/ws` route</strong> forwards the upgrade handshake</li>
-      <li><strong>Same instance</strong> holds room WebSockets</li>
-      <li><strong>Same instance</strong> persists to local SQLite</li>
-      <li><strong>Hibernation</strong> drops idle memory cost to $0</li>
-    </ul>
+  <div class="cf-panel-accent flex flex-col justify-between">
+    <div>
+      <div class="text-xs font-mono uppercase tracking-wider text-orange-600 dark:text-orange-400">Durable Object Architecture</div>
+      <div class="font-semibold text-sm mt-1">1 Self-Contained Instance per Room</div>
+      <ul class="text-xs space-y-1.5 mt-2">
+        <li><strong>Colocated coordination:</strong> Same instance holds room WebSockets</li>
+        <li><strong>Private SQLite:</strong> Disk-backed SQL bypasses 128 MB isolate RAM limit</li>
+        <li><strong>Hibernation:</strong> Sockets stay open while idle instances sleep at $0</li>
+        <li><strong>Zero Redis:</strong> No pub/sub fleet needed for in-room fanout</li>
+      </ul>
+    </div>
+    <div class="mt-3 pt-2.5 border-t border-orange-500/30 text-xs text-orange-600 dark:text-orange-400 font-medium">
+      <strong>Best for:</strong> Scoped collaboration (2–500 users), lock-free single-writer state, sparse idle sockets.
+    </div>
   </div>
 </div>
 
@@ -291,8 +279,10 @@ if (url.pathname === `/rooms/${roomId}/ws` && request.headers.get("Upgrade") ===
 </div>
 
 <!--
-Traditional real-time stacks require separate WebSocket fleets and Redis Pub/Sub to sync servers.
-With Durable Objects, room members already route to the same coordinator, eliminating the pub/sub tier entirely.
+Architectural comparison:
+- When to use Typical Architecture: Massive one-to-many fanout (10k+ listeners on one channel like a sports ticker) or complex cross-table SQL reporting.
+- When to use Durable Objects: Scoped collaborative groups (chat channels, collaborative docs, game lobbies), single-writer state machines (auctions, seat reservations), and sparse connections where hibernation eliminates idle gateway costs.
+- The 128 MB isolate limit is managed by persisting state directly to embedded SQLite rather than accumulating in-memory buffers.
 -->
 
 ---
